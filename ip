@@ -1,0 +1,138 @@
+import socket
+import threading
+import subprocess
+import tkinter as tk
+from tkinter import messagebox, simpledialog
+from urllib.parse import urlparse
+import requests
+import ssl
+
+# Set up the server
+server_host = '127.0.0.1'  # Change this to your desired server IP address
+server_port = 12345  # Change this to your desired server port
+
+# Set up the client
+client_host = '127.0.0.1'  # Change this to your desired client IP address
+client_port = 54321  # Change this to your desired client port
+
+# SSL/TLS certificate configuration
+ssl_certificate_file = 'server.crt'  # Path to server certificate file
+ssl_private_key_file = 'server.key'  # Path to server private key file
+
+# Install required libraries
+subprocess.run(['pip', 'install', '-r', 'requirements.txt'], check=True)
+
+# Create the server socket with SSL/TLS
+server_socket = ssl.wrap_socket(socket.socket(socket.AF_INET, socket.SOCK_STREAM),
+                               certfile=ssl_certificate_file,
+                               keyfile=ssl_private_key_file,
+                               server_side=True)
+
+server_socket.bind((server_host, server_port))
+server_socket.listen(5)
+
+# Create the client socket with SSL/TLS
+client_socket = ssl.wrap_socket(socket.socket(socket.AF_INET, socket.SOCK_STREAM),
+                               cert_reqs=ssl.CERT_REQUIRED)
+
+client_socket.connect((client_host, client_port))
+
+# List to keep track of connected clients
+clients = []
+
+# Welcome slide
+root = tk.Tk()
+root.withdraw()
+
+# Create a custom icon
+icon_image = tk.PhotoImage(file="icon.png")
+root.iconphoto(True, icon_image)
+
+messagebox.showinfo("Welcome to Parallel VPN", "Click 'Continue' to proceed.")
+
+def handle_connection(conn1, conn2):
+    while True:
+        data = conn1.recv(1024)
+        if not data:
+            break
+        conn2.sendall(data)
+
+    conn1.close()
+    conn2.close()
+
+# Pop-up terminal for user interaction
+def continue_button():
+    messagebox.showinfo("Continue", "Continue")
+
+def login():
+    # Create a login page
+    email = simpledialog.askstring("Login", "Email Address")
+    password = simpledialog.askstring("Login", "Password", show="*")
+    if email and password:
+        # Process login credentials
+        # Add your login logic here
+        messagebox.showinfo("Login", "Successfully logged in!")
+    else:
+        messagebox.showinfo("Login", "Login canceled.")
+
+def check_website_security(url):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            messagebox.showinfo("Website Security", "The website is secure.")
+        else:
+            messagebox.showwarning("Website Security", "The website is not secure.")
+    except requests.exceptions.RequestException:
+        messagebox.showerror("Website Security", "Failed to connect to the website.")
+
+continue_thread = threading.Thread(target=continue_button)
+continue_thread.start()
+
+# Create a firewall tool
+def firewall():
+    messagebox.showinfo("Firewall", "Firewall is enabled.")
+
+# Add firewall icon to the system tray
+def add_firewall_icon():
+    firewall_icon = tk.PhotoImage(file="firewall_icon.png")
+    root.iconphoto(True, firewall_icon)
+
+# Add login icon to the system tray
+def add_login_icon():
+    login_icon = tk.PhotoImage(file="login_icon.png")
+    root.iconphoto(True, login_icon)
+
+# Set the background color
+root.configure(bg="sky blue")
+
+# Display "Please hang up" message
+tk.Label(root, text="Please hang up", fg="black", bg="sky blue").pack()
+
+# Add firewall and login icons to the system tray
+add_firewall_icon()
+add_login_icon()
+
+print('Server listening on', server_host, ':', server_port)
+print('Client connected to', client_host, ':', client_port)
+
+while True:
+    server_conn, server_addr = server_socket.accept()
+    client_conn, client_addr = client_socket.accept()
+
+    # Create a thread to handle the connection
+    thread = threading.Thread(target=handle_connection, args=(server_conn, client_conn))
+    thread.start()
+
+    clients.append(thread)
+
+    print('Connected:', server_addr, '->', client_addr)
+
+    # Check website security before opening it
+    url = input("Enter the website URL: ")  # Replace with your method of obtaining the website URL
+    parsed_url = urlparse(url)
+    if parsed_url.scheme in ["http", "https"]:
+        messagebox.showinfo("Website Security", "Please stand by while we check your browser's connections.")
+        check_website_security(url)
+    else:
+        messagebox.showwarning("Invalid URL", "Please enter a valid URL starting with 'http://' or 'https://'.")
+
